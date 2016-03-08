@@ -315,10 +315,9 @@ replaceLocalValuesImpl (const LO localRowIndex,
                         const Scalar vals[]) const
 {
   little_vec_type X_dst = getLocalBlock (localRowIndex, colIndex);
-  const LO strideX = 1;
   const_little_vec_type X_src (reinterpret_cast<const impl_scalar_type*> (vals),
-                               getBlockSize (), strideX);
-  deep_copy (X_dst, X_src);
+                               getBlockSize ());
+  Kokkos::deep_copy (X_dst, X_src);
 }
 
 
@@ -361,9 +360,8 @@ sumIntoLocalValuesImpl (const LO localRowIndex,
                         const Scalar vals[]) const
 {
   little_vec_type X_dst = getLocalBlock (localRowIndex, colIndex);
-  const LO strideX = 1;
   const_little_vec_type X_src (reinterpret_cast<const impl_scalar_type*> (vals),
-                               getBlockSize (), strideX);
+                               getBlockSize ());
   AXPY (STS::one (), X_src, X_dst);
 }
 
@@ -434,14 +432,13 @@ getLocalBlock (const LO localRowIndex,
                const LO colIndex) const
 {
   if (! isValidLocalMeshIndex (localRowIndex)) {
-    return little_vec_type (NULL, 0, 0);
+    return little_vec_type ();
   } else {
-    const LO strideX = this->getStrideX ();
     const size_t blockSize = getBlockSize ();
     const size_t offset = colIndex * this->getStrideY () +
-      localRowIndex * blockSize * strideX;
+      localRowIndex * blockSize;
     impl_scalar_type* blockRaw = this->getRawPtr () + offset;
-    return little_vec_type (blockRaw, blockSize, strideX);
+    return little_vec_type (blockRaw, blockSize);
   }
 }
 
@@ -565,10 +562,10 @@ packAndPrepare (const Tpetra::SrcDistObject& src,
       for (LO j = 0; j < numVecs; ++j, curExportPos += blockSize) {
         const LO meshLid = exportLIDs[meshLidIndex];
         impl_scalar_type* const curExportPtr = &exports[curExportPos];
-        little_vec_type X_dst (curExportPtr, blockSize, 1);
+        little_vec_type X_dst (curExportPtr, blockSize);
         little_vec_type X_src = srcAsBmv.getLocalBlock (meshLid, j);
 
-        deep_copy (X_dst, X_src);
+        Kokkos::deep_copy (X_dst, X_src);
       }
     }
   } catch (std::exception& e) {
@@ -619,7 +616,7 @@ unpackAndCombine (const Teuchos::ArrayView<const LO>& importLIDs,
       const LO meshLid = importLIDs[meshLidIndex];
       const impl_scalar_type* const curImportPtr = &imports[curImportPos];
 
-      const_little_vec_type X_src (curImportPtr, blockSize, 1);
+      const_little_vec_type X_src (curImportPtr, blockSize);
       little_vec_type X_dst = getLocalBlock (meshLid, j);
 
       if (CM == INSERT || CM == REPLACE) {

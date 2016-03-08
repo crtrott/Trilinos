@@ -436,7 +436,7 @@ namespace Experimental {
     const LO blockSize = getBlockSize ();
     Teuchos::Array<impl_scalar_type> localMem (blockSize);
     Teuchos::Array<impl_scalar_type> localMat (blockSize*blockSize);
-    little_vec_type X_lcl (localMem.getRawPtr (), blockSize, 1);
+    little_vec_type X_lcl (localMem.getRawPtr (), blockSize);
 
     // FIXME (mfh 12 Aug 2014) This probably won't work if LO is unsigned.
     LO rowBegin = 0, rowEnd = 0, rowStride = 0;
@@ -1120,7 +1120,7 @@ namespace Experimental {
     // on making this fast for GPUs.
     const LO blockSize = getBlockSize ();
     Teuchos::Array<impl_scalar_type> localMem (blockSize);
-    little_vec_type Y_lcl (localMem.getRawPtr (), blockSize, 1);
+    little_vec_type Y_lcl (localMem.getRawPtr (), blockSize);
 
     if (numVecs == 1) {
       for (LO lclRow = 0; lclRow < numLocalMeshRows; ++lclRow) {

@@ -171,8 +171,16 @@ public:
 
   typedef LittleBlock<impl_scalar_type, LO> little_block_type;
   typedef LittleBlock<const impl_scalar_type, LO> const_little_block_type;
-  typedef LittleVector<impl_scalar_type, LO> little_vec_type;
-  typedef LittleVector<const impl_scalar_type, LO> const_little_vec_type;
+  typedef Kokkos::View<impl_scalar_type*,
+                       Kokkos::LayoutRight,
+                       device_type,
+                       Kokkos::MemoryTraits<Kokkos::Unmanaged> >
+          little_vec_type;
+  typedef Kokkos::View<const impl_scalar_type*,
+                       Kokkos::LayoutRight,
+                       device_type,
+                       Kokkos::MemoryTraits<Kokkos::Unmanaged> >
+          const_little_vec_type;
 
   //@}
   //! \name Constructors and destructor
