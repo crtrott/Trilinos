@@ -454,11 +454,11 @@ void RBILUK<MatrixType>::compute ()
     Teuchos::Array<int> colflag(num_cols);
 
     Teuchos::Array<impl_scalar_type> diagMod(blockMatSize,STM::zero());
-    little_block_type diagModBlock(&diagMod[0], blockSize_, rowStride, colStride);
+    little_block_type diagModBlock((typename little_block_type::value_type*) &diagMod[0], blockSize_, rowStride);
     Teuchos::Array<impl_scalar_type> matTmpArray(blockMatSize,STM::zero());
-    little_block_type matTmp(&matTmpArray[0], blockSize_, rowStride, colStride);
+    little_block_type matTmp((typename little_block_type::value_type*) &matTmpArray[0], blockSize_, rowStride);
     Teuchos::Array<impl_scalar_type> multiplierArray(blockMatSize, STM::zero());
-    little_block_type multiplier(&multiplierArray[0], blockSize_, rowStride, colStride);
+    little_block_type multiplier((typename little_block_type::value_type*) &multiplierArray[0], blockSize_, rowStride);
 
 //    Teuchos::ArrayRCP<scalar_type> DV = D_->get1dViewNonConst(); // Get view of diagonal
 
@@ -485,15 +485,15 @@ void RBILUK<MatrixType>::compute ()
       for (local_ordinal_type j = 0; j < NumL; ++j)
       {
         const local_ordinal_type matOffset = blockMatSize*j;
-        little_block_type lmat(&valsL[matOffset],blockSize_,rowStride, colStride);
-        little_block_type lmatV(&InV[matOffset],blockSize_,rowStride, colStride);
+        little_block_type lmat((typename little_block_type::value_type*) &valsL[matOffset],blockSize_,rowStride);
+        little_block_type lmatV((typename little_block_type::value_type*) &InV[matOffset],blockSize_,rowStride);
         //lmatV.assign(lmat);
         Tpetra::Experimental::COPY (lmat, lmatV);
         InI[j] = colValsL[j];
       }
 
       little_block_type dmat = D_block_->getLocalBlock(local_row, local_row);
-      little_block_type dmatV(&InV[NumL*blockMatSize], blockSize_, rowStride, colStride);
+      little_block_type dmatV((typename little_block_type::value_type*) &InV[NumL*blockMatSize], blockSize_, rowStride);
       //dmatV.assign(dmat);
       Tpetra::Experimental::COPY (dmat, dmatV);
       InI[NumL] = local_row;
@@ -507,8 +507,8 @@ void RBILUK<MatrixType>::compute ()
         if (!(colValsU[j] < numLocalRows)) continue;
         InI[NumL+1+j] = colValsU[j];
         const local_ordinal_type matOffset = blockMatSize*(NumL+1+j);
-        little_block_type umat(&valsU[blockMatSize*j], blockSize_, rowStride, colStride);
-        little_block_type umatV(&InV[matOffset], blockSize_, rowStride, colStride);
+        little_block_type umat((typename little_block_type::value_type*) &valsU[blockMatSize*j], blockSize_, rowStride);
+        little_block_type umatV((typename little_block_type::value_type*) &InV[matOffset], blockSize_, rowStride);
         //umatV.assign(umat);
         Tpetra::Experimental::COPY (umat, umatV);
         NumU += 1;
@@ -522,11 +522,11 @@ void RBILUK<MatrixType>::compute ()
 
 
       scalar_type diagmod = STM::zero (); // Off-diagonal accumulator
-      Tpetra::Experimental::deep_copy (diagModBlock, diagmod);
+      Kokkos::deep_copy (diagModBlock, diagmod);
 
       for (local_ordinal_type jj = 0; jj < NumL; ++jj) {
         local_ordinal_type j = InI[jj];
-        little_block_type currentVal(&InV[jj*blockMatSize], blockSize_, rowStride, colStride); // current_mults++;
+        little_block_type currentVal((typename little_block_type::value_type*) &InV[jj*blockMatSize], blockSize_, rowStride); // current_mults++;
         //multiplier.assign(currentVal);
         Tpetra::Experimental::COPY (currentVal, multiplier);
 
@@ -547,8 +547,8 @@ void RBILUK<MatrixType>::compute ()
             if (!(UUI[k] < numLocalRows)) continue;
             const int kk = colflag[UUI[k]];
             if (kk > -1) {
-              little_block_type kkval(&InV[kk*blockMatSize], blockSize_, rowStride, colStride);
-              little_block_type uumat(&UUV[k*blockMatSize], blockSize_, rowStride, colStride);
+              little_block_type kkval((typename little_block_type::value_type*) &InV[kk*blockMatSize], blockSize_, rowStride);
+              little_block_type uumat((typename little_block_type::value_type*) &UUV[k*blockMatSize], blockSize_, rowStride);
               Tpetra::Experimental::GEMM ("N", "N", -STM::one (), multiplier, uumat,
                                           STM::one (), kkval);
               //blockMatOpts.square_matrix_matrix_multiply(reinterpret_cast<impl_scalar_type*> (multiplier.ptr_on_device ()), reinterpret_cast<impl_scalar_type*> (uumat.ptr_on_device ()), reinterpret_cast<impl_scalar_type*> (kkval.ptr_on_device ()), blockSize_, -STM::one(), STM::one());
@@ -559,9 +559,9 @@ void RBILUK<MatrixType>::compute ()
           for (local_ordinal_type k = 0; k < NumUU; ++k) {
             if (!(UUI[k] < numLocalRows)) continue;
             const int kk = colflag[UUI[k]];
-            little_block_type uumat(&UUV[k*blockMatSize], blockSize_, rowStride, colStride);
+            little_block_type uumat((typename little_block_type::value_type*) &UUV[k*blockMatSize], blockSize_, rowStride);
             if (kk > -1) {
-              little_block_type kkval(&InV[kk*blockMatSize], blockSize_, rowStride, colStride);
+              little_block_type kkval((typename little_block_type::value_type*) &InV[kk*blockMatSize], blockSize_, rowStride);
               Tpetra::Experimental::GEMM ("N", "N", -STM::one (), multiplier, uumat,
                                           STM::one (), kkval);
               //blockMatOpts.square_matrix_matrix_multiply(reinterpret_cast<impl_scalar_type*>(multiplier.ptr_on_device ()), reinterpret_cast<impl_scalar_type*>(uumat.ptr_on_device ()), reinterpret_cast<impl_scalar_type*>(kkval.ptr_on_device ()), blockSize_, -STM::one(), STM::one());
@@ -616,7 +616,7 @@ void RBILUK<MatrixType>::compute ()
       }
 
       for (local_ordinal_type j = 0; j < NumU; ++j) {
-        little_block_type currentVal(&InV[(NumL+1+j)*blockMatSize], blockSize_, rowStride, colStride); // current_mults++;
+        little_block_type currentVal((typename little_block_type::value_type*) &InV[(NumL+1+j)*blockMatSize], blockSize_, rowStride); // current_mults++;
         // scale U by the diagonal inverse
         Tpetra::Experimental::GEMM ("N", "N", STS::one (), dmat, currentVal,
                                     STS::zero (), matTmp);
@@ -727,7 +727,7 @@ apply (const Tpetra::MultiVector<scalar_type,local_ordinal_type,global_ordinal_t
               little_vec_type prevVal = cBlock.getLocalBlock(col, imv);
 
               const local_ordinal_type matOffset = blockMatSize*j;
-              little_block_type lij(&valsL[matOffset],blockSize_,rowStride, colStride);
+              little_block_type lij((typename little_block_type::value_type*) &valsL[matOffset],blockSize_,rowStride);
 
               //cval.matvecUpdate(-one, lij, prevVal);
               Tpetra::Experimental::GEMV (-one, lij, prevVal, cval);
@@ -762,7 +762,7 @@ apply (const Tpetra::MultiVector<scalar_type,local_ordinal_type,global_ordinal_t
               little_vec_type prevVal = yBlock.getLocalBlock(col, imv);
 
               const local_ordinal_type matOffset = blockMatSize*(NumU-1-j);
-              little_block_type uij(&valsU[matOffset], blockSize_, rowStride, colStride);
+              little_block_type uij((typename little_block_type::value_type*) &valsU[matOffset], blockSize_, rowStride);
 
               //yval.matvecUpdate(-one, uij, prevVal);
               Tpetra::Experimental::GEMV (-one, uij, prevVal, yval);
