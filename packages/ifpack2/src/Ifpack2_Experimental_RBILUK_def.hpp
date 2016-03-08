@@ -687,7 +687,7 @@ apply (const Tpetra::MultiVector<scalar_type,local_ordinal_type,global_ordinal_t
   const BMV xBlock (X, * (A_block_->getColMap ()), blockSize_);
 
   Teuchos::Array<scalar_type> lclarray(blockSize_);
-  little_vec_type lclvec(&lclarray[0], blockSize_, colStride);
+  little_vec_type lclvec((typename little_vec_type::value_type*)&lclarray[0], blockSize_);
   const scalar_type one = STM::one ();
   const scalar_type zero = STM::zero ();
 
