@@ -1119,38 +1119,128 @@ namespace Experimental {
     // two-level parallelization.  Look to Stokhos for best practice
     // on making this fast for GPUs.
     const LO blockSize = getBlockSize ();
-    Teuchos::Array<impl_scalar_type> localMem (blockSize);
-    little_vec_type Y_lcl (localMem.getRawPtr (), blockSize, 1);
 
+    // KJ : workset size; for now, let's just give a number
+    const int rowsPerTeam = 20; 
+
+    typedef Kokkos::TeamPolicy<Kokkos::Schedule<Kokkos::Dynamic>,execution_space> team_policy_type;
+    team_policy_type team_exec((numLocalMeshRows + rowsPerTeam - 1)/rowsPerTeam, Kokkos::AUTO());
+    {
+      const int level = 1; // KJ : hierarhcy level of memory allocated e.g., cache (1), HBM (2), DDR (3), not used for now
+
+      // KJ : for now provide two options for parallelizing (for vs red)
+      const int scratchSizePerTeam   = blockSize*sizeof(impl_scalar_type); // used for team parallel_red
+      const int scratchSizePerThread = blockSize*sizeof(impl_scalar_type); // used for team parallel_for
+      team_exec = team_exec.set_scratch_size( level, 
+                                              Kokkos::PerTeam  (scratchSizePerTeam),
+                                              Kokkos::PerThread(scratchSizePerThread) );
+    }
+
+    // KJ : do we really need to separate numVecs == 1 and multiple numVecs ?
     if (numVecs == 1) {
-      for (LO lclRow = 0; lclRow < numLocalMeshRows; ++lclRow) {
-        little_vec_type Y_cur = Y.getLocalBlock (lclRow, 0);
+#if 1 // team parallel for version
+      Kokkos::parallel_for( team_exec, KOKKOS_LAMBDA( typename team_policy_type::member_type & member ) {
+          const LO leagueRank = member.league_rank();
+          
+          typedef typename execution_space::scratch_memory_space shmem_space ;
+          typedef Kokkos::View<impl_scalar_type*,shmem_space,Kokkos::MemoryUnmanaged> shared_array_type;
+          
+          shared_array_type threadLocalMem = shared_array_type(member.thread_scratch(1), blockSize);
+          little_vec_type Y_tlm (threadLocalMem.ptr_on_device (), blockSize, 1);
+          
+          const LO rowBeg = leagueRank*rowsPerTeam;
+          const LO rowTmp = rowBeg + rowsPerTeam;
+          const LO rowEnd = rowTmp < numLocalMeshRows ? rowTmp : numLocalMeshRows;
 
-        if (beta == zero) {
-          FILL (Y_lcl, zero);
-        } else if (beta == one) {
-          COPY (Y_cur, Y_lcl);
-        } else {
-          COPY (Y_cur, Y_lcl);
-          SCAL (beta, Y_lcl);
-        }
+          Kokkos::parallel_for( Kokkos::TeamThreadRange(member, rowBeg, rowEnd), [&](const LO lclRow) {
+              little_vec_type Y_cur = Y.getLocalBlock (lclRow, 0);
+              
+              if (beta == zero) {
+                FILL (Y_tlm, zero);
+              } else if (beta == one) {
+                COPY (Y_cur, Y_tlm);
+              } else {
+                COPY (Y_cur, Y_tlm);
+                SCAL (beta, Y_tlm);
+              }
+              
+              const size_t meshBeg = ptr_[lclRow];
+              const size_t meshEnd = ptr_[lclRow+1];
+              
+              for (size_t absBlkOff = meshBeg; absBlkOff < meshEnd; ++absBlkOff) {
+                const LO meshCol = ind_[absBlkOff];
+                const_little_block_type A_cur =
+                  getConstLocalBlockFromAbsOffset (absBlkOff);
+                little_vec_type X_cur = X.getLocalBlock (meshCol, 0);
+                // Y_tlm += alpha*A_cur*X_cur
+                //Y_tlm.matvecUpdate (alpha, A_cur, X_cur);
+                GEMV (alpha, A_cur, X_cur, Y_tlm);
+              } // for each entry in the current local row of the matrx
+              
+              COPY (Y_tlm, Y_cur);
+            } ); // for each workset of rows
+        } ); // for each local row of the matrix
+#else // team reduction version
+      Kokkos::parallel_for( team_exec, KOKKOS_LAMBDA( typename team_policy_type::member_type & member ) {
+          const LO leagueRank = member.league_rank();
+          
+          typedef typename execution_space::scratch_memory_space shmem_space ;
+          typedef Kokkos::View<impl_scalar_type*,shmem_space,Kokkos::MemoryUnmanaged> shared_array_type;
+          
+          shared_array_type threadLocalMem = shared_array_type(member.thread_scratch(1), blockSize);
+          little_vec_type Y_tlm (threadLocalMem.ptr_on_device (), blockSize, 1);
+          
+          shared_array_type sharedTeamMem = shared_array_type(member.team_scratch(1), blockSize);
+          little_vec_type Y_stm (sharedTeamMem.ptr_on_device (), blockSize, 1);
+          
+          const LO rowBeg = leagueRank*rowsPerTeam;
+          const LO rowTmp = rowBeg + rowsPerTeam;
+          const LO rowEnd = rowTmp < numLocalMeshRows ? rowTmp : numLocalMeshRows;
 
-        const size_t meshBeg = ptr_[lclRow];
-        const size_t meshEnd = ptr_[lclRow+1];
-        for (size_t absBlkOff = meshBeg; absBlkOff < meshEnd; ++absBlkOff) {
-          const LO meshCol = ind_[absBlkOff];
-          const_little_block_type A_cur =
-            getConstLocalBlockFromAbsOffset (absBlkOff);
-          little_vec_type X_cur = X.getLocalBlock (meshCol, 0);
-          // Y_lcl += alpha*A_cur*X_cur
-          //Y_lcl.matvecUpdate (alpha, A_cur, X_cur);
-          GEMV (alpha, A_cur, X_cur, Y_lcl);
-        } // for each entry in the current local row of the matrx
+          for (LO lclRow = rowBeg; lclRow < rowEnd; ++lclRow) {
+            little_vec_type Y_cur = Y.getLocalBlock (lclRow, 0);
 
-        COPY (Y_lcl, Y_cur);
-      } // for each local row of the matrix
+            FILL (Y_stm, zero);
+            if (beta == zero) {
+              FILL (Y_tlm, zero);
+            } else if (beta == one) {
+              COPY (Y_cur, Y_tlm);
+            } else {
+              COPY (Y_cur, Y_tlm);
+              SCAL (beta, Y_tlm);
+            }
+            
+            const size_t meshBeg = ptr_[lclRow];
+            const size_t meshEnd = ptr_[lclRow+1];
+
+            // KJ : cannot pass little_vec_type as it does not have a default constructor;
+            // even if it exists, it should be initialized thread local little vector.
+            // attempted to bypass the problem but it would not work anyway 
+            // ( it will linearize join or need lock inside ). 
+            // 
+            int dummy = 0;
+            Kokkos::parallel_reduce( Kokkos::TeamThreadRange(member, meshBeg, meshEnd), [&](const LO absBlkOff, int) {
+                const LO meshCol = ind_[absBlkOff];
+                const_little_block_type A_cur =
+                  getConstLocalBlockFromAbsOffset (absBlkOff);
+                little_vec_type X_cur = X.getLocalBlock (meshCol, 0);
+                // Y_tlm += alpha*A_cur*X_cur
+                //Y_tlm.matvecUpdate (alpha, A_cur, X_cur);
+                GEMV (alpha, A_cur, X_cur, Y_tlm);
+              }, [&] (int, int) {
+                AXPY (one, Y_tlm, Y_stm);
+              }, dummy ); // for each entry in the current local row of the matrx
+
+              COPY (Y_stm, Y_cur);
+          } // for each workset of rows
+        } ); // for each local row of the matrix
+#endif
     }
     else {
+      // KJ : temporary array for other routines not kokkorized
+      Teuchos::Array<impl_scalar_type> localMem (blockSize);
+      little_vec_type Y_lcl (localMem.getRawPtr (), blockSize, 1);
+      
       for (LO lclRow = 0; lclRow < numLocalMeshRows; ++lclRow) {
         for (LO j = 0; j < numVecs; ++j) {
           little_vec_type Y_cur = Y.getLocalBlock (lclRow, j);
