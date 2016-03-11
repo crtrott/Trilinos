@@ -1139,7 +1139,7 @@ namespace Experimental {
     // KJ : do we really need to separate numVecs == 1 and multiple numVecs ?
     if (numVecs == 1) {
 #if 1 // team parallel for version
-      Kokkos::parallel_for( team_exec, KOKKOS_LAMBDA( typename team_policy_type::member_type & member ) {
+      Kokkos::parallel_for( team_exec, KOKKOS_LAMBDA( const typename team_policy_type::member_type & member ) {
           const LO leagueRank = member.league_rank();
           
           typedef typename execution_space::scratch_memory_space shmem_space ;
