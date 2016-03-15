@@ -207,7 +207,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(Ifpack2RBILUK, TestLowerTriangularBlockCrsMatr
   for (size_t k = 0; k < num_rows_per_proc; ++k) {
     LO lcl_row = k;
     typename BMV::little_vec_type ylcl = yBlock.getLocalBlock(lcl_row,0);
-    Scalar* yb = ylcl.getRawPtr();
+    Scalar* yb = ylcl.ptr_on_device();
     for (int j = 0; j < blockSize; ++j) {
       TEST_FLOATING_EQUALITY(yb[j],exactSol[k],1e-14);
     }
@@ -261,7 +261,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(Ifpack2RBILUK, TestUpperTriangularBlockCrsMatr
 
   for (int k = 0; k < num_rows_per_proc; ++k) {
     typename BMV::little_vec_type ylcl = yBlock.getLocalBlock(k,0);
-    Scalar* yb = ylcl.getRawPtr();
+    Scalar* yb = ylcl.ptr_on_device();
     for (int j = 0; j < blockSize; ++j) {
       TEST_FLOATING_EQUALITY(yb[j],exactSol[k],1e-14);
     }
@@ -315,7 +315,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(Ifpack2RBILUK, TestFullLocalBlockCrsMatrix, Sc
 
   for (int k = 0; k < num_rows_per_proc; ++k) {
     typename BMV::little_vec_type ylcl = yBlock.getLocalBlock(k,0);
-    Scalar* yb = ylcl.getRawPtr();
+    Scalar* yb = ylcl.ptr_on_device();
     for (int j = 0; j < blockSize; ++j) {
       TEST_FLOATING_EQUALITY(yb[j],exactSol[k],1e-14);
     }
@@ -394,8 +394,8 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(Ifpack2RBILUK, TestBandedBlockCrsMatrixWithDro
 
 TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(Ifpack2RBILUK, TestBlockMatrixOps, Scalar, LocalOrdinal, GlobalOrdinal)
 {
-  typedef Tpetra::Experimental::LittleBlock<Scalar,LocalOrdinal> little_block_type;
-  typedef Tpetra::Experimental::LittleVector<Scalar,LocalOrdinal> little_vec_type;
+  typedef Kokkos::View<Scalar**,Kokkos::LayoutRight,Kokkos::MemoryTraits<Kokkos::Unmanaged> > little_block_type;
+  typedef Kokkos::View<Scalar*,Kokkos::LayoutRight,Kokkos::MemoryTraits<Kokkos::Unmanaged> > little_vec_type;
   typedef typename Kokkos::Details::ArithTraits<Scalar>::val_type impl_scalar_type;
   typedef Teuchos::ScalarTraits<Scalar> STS;
 
@@ -469,10 +469,10 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(Ifpack2RBILUK, TestBlockMatrixOps, Scalar, Loc
   bMatrix[23] = 4;
   bMatrix[24] = -5;
 
-  little_block_type A (aMatrix.getRawPtr (), blockSize, blockSize, 1); // row major
-  little_block_type B (bMatrix.getRawPtr (), blockSize, blockSize, 1); // row major
-  little_block_type C (cMatrix.getRawPtr (), blockSize, blockSize, 1); // row major
-  little_block_type I (identityMatrix.getRawPtr (), blockSize, blockSize, 1); // row major
+  little_block_type A (aMatrix.getRawPtr (), blockSize, blockSize); // row major
+  little_block_type B (bMatrix.getRawPtr (), blockSize, blockSize); // row major
+  little_block_type C (cMatrix.getRawPtr (), blockSize, blockSize); // row major
+  little_block_type I (identityMatrix.getRawPtr (), blockSize, blockSize); // row major
 
   Tpetra::Experimental::GEMM ("N", "N", STS::one (), A, I, STS::zero (), C);
   //blockOps.square_matrix_matrix_multiply(aMatrix.getRawPtr(), identityMatrix.getRawPtr(), cMatrix.getRawPtr(), blockSize);
@@ -525,7 +525,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(Ifpack2RBILUK, TestBlockMatrixOps, Scalar, Loc
   const LocalOrdinal rowStride = blockSize;
   const LocalOrdinal colStride = 1;
 
-  little_block_type dMat(cMatrix.getRawPtr(),blockSize,rowStride,colStride);
+  little_block_type dMat(cMatrix.getRawPtr(),blockSize,rowStride);
   Teuchos::Array<int> ipiv_teuchos(blockSize);
   Kokkos::View<int*, Kokkos::HostSpace,
     Kokkos::MemoryUnmanaged> ipiv (ipiv_teuchos.getRawPtr (), blockSize);
@@ -559,8 +559,8 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(Ifpack2RBILUK, TestBlockMatrixOps, Scalar, Loc
   exactSolution[3] = -0.0384615384615381;
   exactSolution[4] = -0.0384615384615385;
 
-  little_vec_type bval(onevec.getRawPtr(),blockSize,1);
-  little_vec_type xval(computeSolution.getRawPtr(),blockSize,1);
+  little_vec_type bval(onevec.getRawPtr(),blockSize);
+  little_vec_type xval(computeSolution.getRawPtr(),blockSize);
 
   //xval.matvecUpdate(1.0,dMat,bval);
   Tpetra::Experimental::GEMV (1.0, dMat, bval, xval);
@@ -620,7 +620,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(Ifpack2RBILUK, TestDiagonalBlockCrsMatrix, Sca
 
   for (int k = 0; k < num_rows_per_proc; ++k) {
     typename BMV::little_vec_type ylcl = yBlock.getLocalBlock(k,0);
-    Scalar* yb = ylcl.getRawPtr();
+    Scalar* yb = ylcl.ptr_on_device();
     for (int j = 0; j < blockSize; ++j) {
       TEST_FLOATING_EQUALITY(yb[j],exactSol,1e-14);
     }
