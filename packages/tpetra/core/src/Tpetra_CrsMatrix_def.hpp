@@ -2849,7 +2849,6 @@ namespace Tpetra {
       ! hasColMap (), std::runtime_error,
       "This method requires that the matrix have a column Map.");
     const map_type& rowMap = * (this->getRowMap ());
-    const map_type& colMap = * (this->getColMap ());
 
 #ifdef HAVE_TPETRA_DEBUG
     // isCompatible() requires an all-reduce, and thus this check
@@ -2860,14 +2859,6 @@ namespace Tpetra {
       "Map.  You may check this by using Map's isCompatible method: "
       "diag.getMap ()->isCompatible (A.getRowMap ());");
 #endif // HAVE_TPETRA_DEBUG
-
-    // For now, we fill the Vector on the host and sync to device.
-    // Later, we may write a parallel kernel that works entirely on
-    // device.
-    diag.template modify<host_execution_space> ();
-    auto lclVecHost = diag.template getLocalView<host_execution_space> ();
-    // 1-D subview of the first (and only) column of lclVecHost.
-    auto lclVecHost1d = Kokkos::subview (lclVecHost, Kokkos::ALL (), 0);
 
     // Find the diagonal entries and put them in lclVecHost1d.
     const LocalOrdinal myNumRows =
@@ -2889,32 +2880,42 @@ namespace Tpetra {
     // KOKKOS_LAMBDA, because the lambda's body calls methods that
     // aren't yet suitable for marking as CUDA device functions.
 
-    // In a debug build, keep a count of the local number of errors
-    // (hence parallel_reduce).  In a release build, don't count
-    // errors (hence parallel_for).
+    struct getDiagFunctor {
+      typedef Vector<Scalar, LocalOrdinal, GlobalOrdinal, Node, classic> vec_type;
+      typedef CrsMatrix<Scalar, LocalOrdinal, GlobalOrdinal, Node, classic> mat_type;
+      typedef CrsGraph<LocalOrdinal, GlobalOrdinal, Node, classic> graph_type;
+
+      Kokkos::View<impl_scalar_type*, Kokkos::LayoutLeft, execution_space > _lclVecHost1d;
+      const map_type& _rowMap;
+      const map_type& _colMap;
+      const mat_type& _matrix;
+      const graph_type& _staticGraph;
+
+      KOKKOS_INLINE_FUNCTION
 #ifdef HAVE_TPETRA_DEBUG
-    Kokkos::parallel_reduce (range, [=] (const LocalOrdinal& r, GlobalOrdinal& errCount) {
+      void operator()(const LocalOrdinal& r, GlobalOrdinal& errCount) const
 #else
-    Kokkos::parallel_for (range, [=] (const LocalOrdinal& r) {
-#endif // HAVE_TPETRA_DEBUG
-        lclVecHost1d(r) = STS::zero (); // default value if no diag entry
-        const GlobalOrdinal gblInd = rowMap.getGlobalElement (r);
-        const LocalOrdinal lclColInd = colMap.getLocalElement (gblInd);
+      void operator()(const LocalOrdinal& r) const
+#endif
+      {
+        _lclVecHost1d(r) = STS::zero (); // default value if no diag entry
+        const GlobalOrdinal gblInd = _rowMap.getGlobalElement (r);
+        const LocalOrdinal lclColInd = _colMap.getLocalElement (gblInd);
 
         if (lclColInd != Teuchos::OrdinalTraits<LocalOrdinal>::invalid ()) {
-          const RowInfo rowinfo = staticGraph_->getRowInfo (r);
+          const RowInfo rowinfo = _staticGraph.getRowInfo (r);
           if (rowinfo.numEntries > 0) {
-            const size_t j = staticGraph_->findLocalIndex (rowinfo, lclColInd);
+            const size_t j = _staticGraph.findLocalIndex (rowinfo, lclColInd);
             if (j != Teuchos::OrdinalTraits<size_t>::invalid ()) {
               // NOTE (mfh 03 Feb 2016) This may assume UVM.
               const impl_scalar_type* curVals;
               LocalOrdinal numEnt;
               const LocalOrdinal err =
-                this->getViewRawConst (curVals, numEnt, rowinfo);
+                _matrix.getViewRawConst (curVals, numEnt, rowinfo);
               if (err == 0) {
                 // Even in a release build, if an error occurs, don't
                 // attempt to write to memory.
-                lclVecHost1d(r) = curVals[j];
+                _lclVecHost1d(r) = curVals[j];
               }
 #ifdef HAVE_TPETRA_DEBUG
               else {
@@ -2924,10 +2925,31 @@ namespace Tpetra {
             }
           }
         }
+      }
+
+      getDiagFunctor(vec_type& diag, const mat_type* matrix, const graph_type& staticGraph) :
+        _rowMap(*matrix->getRowMap()),
+        _colMap(*matrix->getColMap()),
+        _matrix(*matrix),
+        _staticGraph(staticGraph)
+      {
+        // For now, we fill the Vector on the host and sync to device.
+        // Later, we may write a parallel kernel that works entirely on
+        // device.
+        diag.template modify<host_execution_space> ();
+        auto lclVecHost = diag.template getLocalView<host_execution_space> ();
+        // 1-D subview of the first (and only) column of lclVecHost.
+        _lclVecHost1d = Kokkos::subview (lclVecHost, Kokkos::ALL (), 0);
+      }
+    };
+
+    // In a debug build, keep a count of the local number of errors
+    // (hence parallel_reduce).  In a release build, don't count
+    // errors (hence parallel_for).
 #ifdef HAVE_TPETRA_DEBUG
-      }, lclNumErrs); // reduction result goes at the end
+    Kokkos::parallel_reduce (range, getDiagFunctor(diag,this,*staticGraph_), lclNumErrs);
 #else
-      }); // don't count errors in a release build
+    Kokkos::parallel_for (range, getDiagFunctor(diag,this,*staticGraph_)); // reduction result goes at the end
 #endif // HAVE_TPETRA_DEBUG
 
 #ifdef HAVE_TPETRA_DEBUG
@@ -2970,29 +2992,45 @@ namespace Tpetra {
       "isCompatible) the CrsMatrix's row Map.");
 #endif // HAVE_TPETRA_DEBUG
 
-    // For now, we fill the Vector on the host and sync to device.
-    // Later, we may write a parallel kernel that works entirely on
-    // device.
-    //
-    // NOTE (mfh 21 Jan 2016): The host kernel here assumes UVM.  Once
-    // we write a device kernel, it will not need to assume UVM.
-    diag.template modify<host_execution_space> ();
-    auto lclVecHost = diag.template getLocalView<host_execution_space> ();
-    // 1-D subview of the first (and only) column of lclVecHost.
-    auto lclVecHost1d = Kokkos::subview (lclVecHost, Kokkos::ALL (), 0);
-
     // Find the diagonal entries and put them in lclVecHost1d.
     const LO myNumRows = static_cast<LO> (this->getNodeNumRows ());
     typedef Kokkos::RangePolicy<host_execution_space, LO> policy_type;
-    const size_t INV = Tpetra::Details::OrdinalTraits<size_t>::invalid ();
 
-    Kokkos::parallel_for (policy_type (0, myNumRows), [&] (const LO& lclRow) {
-      lclVecHost1d(lclRow) = STS::zero (); // default value if no diag entry
-      if (offsets(lclRow) != INV) {
-        auto curRow = lclMatrix_.template rowConst<size_t> (lclRow);
-        lclVecHost1d(lclRow) = static_cast<IST> (curRow.value(offsets(lclRow)));
+    struct getDiagFunctor {
+      const size_t _INV;
+      const local_matrix_type& _lclMatrix;
+      Kokkos::View<impl_scalar_type*, Kokkos::LayoutLeft, execution_space > _lclVecHost1d;
+      const Kokkos::View<const size_t*, device_type, Kokkos::MemoryUnmanaged>& _offsets;
+
+      void operator()(const LO& lclRow) const
+      {
+        _lclVecHost1d(lclRow) = STS::zero (); // default value if no diag entry
+        if (_offsets(lclRow) != _INV) {
+          auto curRow = _lclMatrix.template rowConst<size_t> (lclRow);
+          _lclVecHost1d(lclRow) = static_cast<IST> (curRow.value(_offsets(lclRow)));
+        }
       }
-    });
+
+      getDiagFunctor(vec_type& diag, const local_matrix_type& lclMatrix,
+          const Kokkos::View<const size_t*, device_type, Kokkos::MemoryUnmanaged>& offsets) :
+            _INV(Tpetra::Details::OrdinalTraits<size_t>::invalid()),
+            _lclMatrix(lclMatrix),
+            _offsets(offsets)
+      {
+        // For now, we fill the Vector on the host and sync to device.
+        // Later, we may write a parallel kernel that works entirely on
+        // device.
+        //
+        // NOTE (mfh 21 Jan 2016): The host kernel here assumes UVM.  Once
+        // we write a device kernel, it will not need to assume UVM.
+        diag.template modify<host_execution_space> ();
+        auto lclVecHost = diag.template getLocalView<host_execution_space> ();
+        // 1-D subview of the first (and only) column of lclVecHost.
+        _lclVecHost1d = Kokkos::subview (lclVecHost, Kokkos::ALL (), 0);
+      }
+    };
+
+    Kokkos::parallel_for (policy_type (0, myNumRows), getDiagFunctor(diag,lclMatrix_,offsets));
     diag.template sync<execution_space> (); // sync changes back to device
   }
 
@@ -3019,29 +3057,49 @@ namespace Tpetra {
       "isCompatible) the CrsMatrix's row Map.");
 #endif // HAVE_TPETRA_DEBUG
 
-    // For now, we fill the Vector on the host and sync to device.
-    // Later, we may write a parallel kernel that works entirely on
-    // device.
-    diag.template modify<host_execution_space> ();
-    auto lclVecHost = diag.template getLocalView<host_execution_space> ();
-    // 1-D subview of the first (and only) column of lclVecHost.
-    auto lclVecHost1d = Kokkos::subview (lclVecHost, Kokkos::ALL (), 0);
-
     Kokkos::View<const size_t*, Kokkos::HostSpace,
                  Kokkos::MemoryTraits<Kokkos::Unmanaged> >
       h_offsets (offsets.getRawPtr (), offsets.size ());
     // Find the diagonal entries and put them in lclVecHost1d.
     const LO myNumRows = static_cast<LO> (this->getNodeNumRows ());
     typedef Kokkos::RangePolicy<host_execution_space, LO> policy_type;
-    const size_t INV = Tpetra::Details::OrdinalTraits<size_t>::invalid ();
 
-    Kokkos::parallel_for (policy_type (0, myNumRows), [&] (const LO& lclRow) {
-      lclVecHost1d(lclRow) = STS::zero (); // default value if no diag entry
-      if (h_offsets[lclRow] != INV) {
-        auto curRow = lclMatrix_.template rowConst<size_t> (lclRow);
-        lclVecHost1d(lclRow) = static_cast<IST> (curRow.value(h_offsets[lclRow]));
+    struct getDiagFunctor {
+      const size_t _INV;
+      const local_matrix_type& _lclMatrix;
+      Kokkos::View<impl_scalar_type*, Kokkos::LayoutLeft, execution_space > _lclVecHost1d;
+      const Kokkos::View<const size_t*, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::Unmanaged> >& _h_offsets;
+
+      void operator()(const LO& lclRow) const
+      {
+        _lclVecHost1d(lclRow) = STS::zero (); // default value if no diag entry
+        if (_h_offsets[lclRow] != _INV) {
+          auto curRow = _lclMatrix.template rowConst<size_t> (lclRow);
+          _lclVecHost1d(lclRow) = static_cast<IST> (curRow.value(_h_offsets[lclRow]));
+        }
       }
-    });
+
+      getDiagFunctor(vec_type& diag, const local_matrix_type& lclMatrix,
+          const Kokkos::View<const size_t*, Kokkos::HostSpace,
+                Kokkos::MemoryTraits<Kokkos::Unmanaged> >& h_offsets) :
+            _INV(Tpetra::Details::OrdinalTraits<size_t>::invalid()),
+            _lclMatrix(lclMatrix),
+            _h_offsets(h_offsets)
+      {
+        // For now, we fill the Vector on the host and sync to device.
+        // Later, we may write a parallel kernel that works entirely on
+        // device.
+        //
+        // NOTE (mfh 21 Jan 2016): The host kernel here assumes UVM.  Once
+        // we write a device kernel, it will not need to assume UVM.
+        diag.template modify<host_execution_space> ();
+        auto lclVecHost = diag.template getLocalView<host_execution_space> ();
+        // 1-D subview of the first (and only) column of lclVecHost.
+        _lclVecHost1d = Kokkos::subview (lclVecHost, Kokkos::ALL (), 0);
+      }
+    };
+
+    Kokkos::parallel_for (policy_type (0, myNumRows), getDiagFunctor(diag,lclMatrix_,h_offsets));
     diag.template sync<execution_space> (); // sync changes back to device
   }
 
@@ -7141,3 +7199,5 @@ namespace Tpetra {
   TPETRA_CRSMATRIX_EXPORT_AND_FILL_COMPLETE_INSTANT(SCALAR, LO, GO, NODE)
 
 #endif // TPETRA_CRSMATRIX_DEF_HPP
+
+
