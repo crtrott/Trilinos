@@ -515,17 +515,25 @@ spmv (const char mode[], \
   typedef Kokkos::Details::ArithTraits<coefficient_type> KAT; \
   \
   if (alpha == KAT::zero ()) { \
-    spmv_alpha<AMatrix, XVector, YVector, 0> (mode, alpha, A, x, beta, y); \
+    if (beta != KAT::one ()) { \
+      KokkosBlas::scal (y, beta, y); \
+    } \
+    return; \
   } \
-  else if (alpha == KAT::one ()) { \
-    spmv_alpha<AMatrix, XVector, YVector, 1> (mode, alpha, A, x, beta, y); \
+  \
+  if (beta == KAT::zero ()) { \
+    spmv_beta<AMatrix, XVector, YVector, 0> (mode, alpha, A, x, beta, y); \
   } \
-  else if (alpha == -KAT::one ()) { \
-    spmv_alpha<AMatrix, XVector, YVector, -1> (mode, alpha, A, x, beta, y); \
+  else if (beta == KAT::one ()) { \
+    spmv_beta<AMatrix, XVector, YVector, 1> (mode, alpha, A, x, beta, y); \
+  } \
+  else if (beta == -KAT::one ()) { \
+    spmv_beta<AMatrix, XVector, YVector, -1> (mode, alpha, A, x, beta, y); \
   } \
   else { \
-    spmv_alpha<AMatrix, XVector, YVector, 2> (mode, alpha, A, x, beta, y); \
+    spmv_beta<AMatrix, XVector, YVector, 2> (mode, alpha, A, x, beta, y); \
   } \
+  \
 }
 
 
