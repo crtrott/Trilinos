@@ -286,18 +286,18 @@ spmv_beta_no_transpose (typename YVector::const_value_type& alpha,
   SPMV_Functor<AMatrix,XVector,YVector,dobeta,conjugate> func (alpha,A,x,beta,y,rows_per_team);
 
   if(A.nnz()>10000000) {
-    Kokkos::TeamPolicy<Kokkos::Schedule<Kokkos::Dynamic> > policy(1,1);
+    Kokkos::TeamPolicy<execution_space, Kokkos::Schedule<Kokkos::Dynamic> > policy(1,1);
     if(team_size<0)
-      policy = Kokkos::TeamPolicy<Kokkos::Schedule<Kokkos::Dynamic> >(worksets,Kokkos::AUTO,vector_length);
+      policy = Kokkos::TeamPolicy<execution_space, Kokkos::Schedule<Kokkos::Dynamic> >(worksets,Kokkos::AUTO,vector_length);
     else
-      policy = Kokkos::TeamPolicy<Kokkos::Schedule<Kokkos::Dynamic> >(worksets,team_size,vector_length);
+      policy = Kokkos::TeamPolicy<execution_space, Kokkos::Schedule<Kokkos::Dynamic> >(worksets,team_size,vector_length);
     Kokkos::parallel_for(policy,func);
   } else {
-    Kokkos::TeamPolicy<Kokkos::Schedule<Kokkos::Static> > policy(1,1);
+    Kokkos::TeamPolicy<execution_space, Kokkos::Schedule<Kokkos::Static> > policy(1,1);
     if(team_size<0)
-      policy = Kokkos::TeamPolicy<Kokkos::Schedule<Kokkos::Static> >(worksets,Kokkos::AUTO,vector_length);
+      policy = Kokkos::TeamPolicy<execution_space, Kokkos::Schedule<Kokkos::Static> >(worksets,Kokkos::AUTO,vector_length);
     else
-      policy = Kokkos::TeamPolicy<Kokkos::Schedule<Kokkos::Static> >(worksets,team_size,vector_length);
+      policy = Kokkos::TeamPolicy<execution_space, Kokkos::Schedule<Kokkos::Static> >(worksets,team_size,vector_length);
     Kokkos::parallel_for(policy,func);
   }
 }
