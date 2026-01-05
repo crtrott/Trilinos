@@ -433,49 +433,49 @@ void resize_view(Kokkos::View<SrcT, SrcArgs...> &src,
 namespace Kokkos {
 
 template <class DstT, class... DstArgs, class SrcT>
-  requires(!Kokkos::is_view_v<SrcT>)
+  requires(!Kokkos::is_view_v<SrcT> && std::is_assignable_v<Sacado::Fad::Exp::GeneralFad<DstT>, SrcT>)
 void deep_copy(
     const Kokkos::View<Sacado::Fad::Exp::GeneralFad<DstT>, DstArgs...> &src,
     SrcT val) {
   Sacado::Impl::deep_copy_view(src, val);
 }
 template <class DstT, class... DstArgs, class SrcT>
-  requires(!Kokkos::is_view_v<SrcT>)
+  requires(!Kokkos::is_view_v<SrcT> && std::is_assignable_v<Sacado::Fad::Exp::GeneralFad<DstT>, SrcT>)
 void deep_copy(
     const Kokkos::View<Sacado::Fad::Exp::GeneralFad<DstT> *, DstArgs...> &src,
     SrcT val) {
   Sacado::Impl::deep_copy_view(src, val);
 }
 template <class DstT, class... DstArgs, class SrcT>
-  requires(!Kokkos::is_view_v<SrcT>)
+  requires(!Kokkos::is_view_v<SrcT> && std::is_assignable_v<Sacado::Fad::Exp::GeneralFad<DstT>, SrcT>)
 void deep_copy(
     const Kokkos::View<Sacado::Fad::Exp::GeneralFad<DstT> **, DstArgs...> &src,
     SrcT val) {
   Sacado::Impl::deep_copy_view(src, val);
 }
 template <class DstT, class... DstArgs, class SrcT>
-  requires(!Kokkos::is_view_v<SrcT>)
+  requires(!Kokkos::is_view_v<SrcT> && std::is_assignable_v<Sacado::Fad::Exp::GeneralFad<DstT>, SrcT>)
 void deep_copy(
     const Kokkos::View<Sacado::Fad::Exp::GeneralFad<DstT> ***, DstArgs...> &src,
     SrcT val) {
   Sacado::Impl::deep_copy_view(src, val);
 }
 template <class DstT, class... DstArgs, class SrcT>
-  requires(!Kokkos::is_view_v<SrcT>)
+  requires(!Kokkos::is_view_v<SrcT> && std::is_assignable_v<Sacado::Fad::Exp::GeneralFad<DstT>, SrcT>)
 void deep_copy(const Kokkos::View<Sacado::Fad::Exp::GeneralFad<DstT> ****,
                                   DstArgs...> &src,
                SrcT val) {
   Sacado::Impl::deep_copy_view(src, val);
 }
 template <class DstT, class... DstArgs, class SrcT>
-  requires(!Kokkos::is_view_v<SrcT>)
+  requires(!Kokkos::is_view_v<SrcT> && std::is_assignable_v<Sacado::Fad::Exp::GeneralFad<DstT>, SrcT>)
 void deep_copy(const Kokkos::View<Sacado::Fad::Exp::GeneralFad<DstT> *****,
                                   DstArgs...> &src,
                SrcT val) {
   Sacado::Impl::deep_copy_view(src, val);
 }
 template <class DstT, class... DstArgs, class SrcT>
-  requires(!Kokkos::is_view_v<SrcT>)
+  requires(!Kokkos::is_view_v<SrcT> && std::is_assignable_v<Sacado::Fad::Exp::GeneralFad<DstT>, SrcT>)
 void deep_copy(const Kokkos::View<Sacado::Fad::Exp::GeneralFad<DstT> ******,
                                   DstArgs...> &src,
                SrcT val) {
