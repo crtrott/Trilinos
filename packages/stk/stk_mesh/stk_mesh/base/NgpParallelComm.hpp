@@ -127,7 +127,7 @@ void ngp_parallel_data_excahnge_sym_pack_unpack(MPI_Comm mpi_communicator,
   std::vector<MPI_Status> statuses(num_comm_procs);
 
   using BufferView = Kokkos::View<Scalar*, typename NgpSpace::mem_space>;
-  using BufferHostView = typename BufferView::HostMirror;
+  using BufferHostView = typename BufferView::host_mirror_type;
   const auto totalMsgSizeForAllProcs = hostBufferOffsets(num_comm_procs);
   auto deviceSendData = BufferView(Kokkos::view_alloc(Kokkos::WithoutInitializing, "deviceSendData"), totalMsgSizeForAllProcs);
   auto deviceRecvData = BufferView(Kokkos::view_alloc(Kokkos::WithoutInitializing, "deviceRecvData"), totalMsgSizeForAllProcs);
