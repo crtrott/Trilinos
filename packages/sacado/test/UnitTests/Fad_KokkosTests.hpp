@@ -560,7 +560,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   const size_type fad_size = global_fad_size;
   v = ViewType ("view", num_rows, num_cols, fad_size+1);
 #endif
-#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC) && !defined(KOKKOS_ENABLE_IMPL_VIEW_LEGACY)
   auto va = Sacado::as_scalar_view(v);
 #else
   typename ViewType::array_type va = v;
@@ -608,7 +608,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   const size_type fad_size = global_fad_size;
   v = ViewType ("view", num_rows, num_cols, fad_size+1);
 #endif
-#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC) && !defined(KOKKOS_ENABLE_IMPL_VIEW_LEGACY)
   auto va = Sacado::as_scalar_view(v);
 #else
   typename ViewType::array_type va = v;
@@ -655,7 +655,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   const size_type fad_size = global_fad_size;
   v = ViewType ("view", num_rows, num_cols, fad_size+1);
 #endif
-#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC) && !defined(KOKKOS_ENABLE_IMPL_VIEW_LEGACY)
   auto va = Sacado::as_scalar_view(v);
 #else
   typename ViewType::array_type va = v;
@@ -702,7 +702,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
 #else
   v = ViewType ("view", num_rows, num_cols, fad_size+1);
 #endif
-#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC) && !defined(KOKKOS_ENABLE_IMPL_VIEW_LEGACY)
   auto va = Sacado::as_scalar_view(v);
 #else
   typename ViewType::array_type va = v;
@@ -758,7 +758,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
 #else
   v = ViewType ("view", num_rows, num_cols, num_slices, fad_size+1);
 #endif
-#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC) && !defined(KOKKOS_ENABLE_IMPL_VIEW_LEGACY)
   auto va = Sacado::as_scalar_view(v);
 #else
   typename ViewType::array_type va = v;
@@ -823,7 +823,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
 #else
   v = ViewType ("view", num_rows, num_cols, num_slices, fad_size+1);
 #endif
-#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC) && !defined(KOKKOS_ENABLE_IMPL_VIEW_LEGACY)
   auto va = Sacado::as_scalar_view(v);
 #else
   typename ViewType::array_type va = v;
@@ -888,7 +888,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   const size_type fad_size = global_fad_size;
   v = ViewType ("view", num_rows, fad_size+1);
 #endif
-#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC) && !defined(KOKKOS_ENABLE_IMPL_VIEW_LEGACY)
   auto va = Sacado::as_scalar_view(v);
 #else
   typename ViewType::array_type va = v;
@@ -937,7 +937,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   v = ViewType ("view", num_rows, fad_size+1);
   a = ScalarViewType ("fad", fad_size+1);
 #endif
-#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC) && !defined(KOKKOS_ENABLE_IMPL_VIEW_LEGACY)
   auto va = Sacado::as_scalar_view(v);
 #else
   typename ViewType::array_type va = v;
@@ -1285,7 +1285,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   v = ViewType ("view", 100, 1, 2, 3, 4, 5, 6, fad_size+1);
 #endif
   host_view_type h_v = Kokkos::create_mirror_view(v);
-#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+#if KOKKOS_VERSION >= 40799 && !defined (SACADO_DISABLE_FAD_VIEW_SPEC) && !defined(KOKKOS_ENABLE_IMPL_VIEW_LEGACY)
   auto h_a = Sacado::as_scalar_view(h_v);
 #else
   typename host_view_type::array_type h_a = h_v;
