@@ -1992,8 +1992,14 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   Kokkos::deep_copy(v, h_v);
 
   // Create two non-contiguous subviews on device (two different columns)
+  // Using columns within valid range [0, num_cols-1]
   size_type src_col = 1;
   size_type dst_col = 3;
+  TEUCHOS_TEST_FOR_EXCEPTION(
+    src_col >= num_cols || dst_col >= num_cols,
+    std::logic_error,
+    "Test columns must be within valid range [0, " << num_cols-1 << "]"
+  );
   auto src_subview = Kokkos::subview(v, Kokkos::ALL(), src_col);
   auto dst_subview = Kokkos::subview(v, Kokkos::ALL(), dst_col);
 
