@@ -1964,6 +1964,54 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   }
 }
 
+TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
+  Kokkos_View_Fad, DeepCopyNonContiguous, FadType, Layout, Device )
+{
+  typedef Kokkos::View<FadType**,Layout,Device> ViewType;
+  typedef typename ViewType::size_type size_type;
+  typedef typename ViewType::host_mirror_type host_view_type;
+
+  const size_type num_rows = global_num_rows;
+  const size_type num_cols = global_num_cols;
+  const size_type fad_size = global_fad_size;
+
+  // Create and fill view on host
+  ViewType v;
+#if defined (SACADO_DISABLE_FAD_VIEW_SPEC)
+  v = ViewType ("view", num_rows, num_cols);
+#else
+  v = ViewType ("view", num_rows, num_cols, fad_size+1);
+#endif
+  host_view_type h_v = Kokkos::create_mirror_view(v);
+  for (size_type i=0; i<num_rows; ++i) {
+    for (size_type j=0; j<num_cols; ++j) {
+      FadType f = generate_fad<FadType>(num_rows, num_cols, fad_size, i, j);
+      h_v(i,j) = f;
+    }
+  }
+  Kokkos::deep_copy(v, h_v);
+
+  // Create two non-contiguous subviews on device (two different columns)
+  size_type src_col = 1;
+  size_type dst_col = 3;
+  auto src_subview = Kokkos::subview(v, Kokkos::ALL(), src_col);
+  auto dst_subview = Kokkos::subview(v, Kokkos::ALL(), dst_col);
+
+  // Perform device-to-device deep_copy between non-contiguous views
+  // This should work because both views are in the same memory/execution space
+  Kokkos::deep_copy(dst_subview, src_subview);
+
+  // Copy back to host to verify
+  Kokkos::deep_copy(h_v, v);
+
+  // Check that dst_col now contains the same values as src_col
+  success = true;
+  for (size_type i=0; i<num_rows; ++i) {
+    FadType f_expected = generate_fad<FadType>(num_rows, num_cols, fad_size, i, src_col);
+    success = success && checkFads(f_expected, h_v(i,dst_col), out);
+  }
+}
+
 #ifdef SACADO_NEW_FAD_DESIGN_IS_DEFAULT
 TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   Kokkos_View_Fad, ConstViewAssign, FadType, Layout, Device )
@@ -2672,6 +2720,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_3_DECL(
   TEUCHOS_UNIT_TEST_TEMPLATE_3_INSTANT( Kokkos_View_Fad, SubdynrankviewScalar, F, L, D ) \
   TEUCHOS_UNIT_TEST_TEMPLATE_3_INSTANT( Kokkos_View_Fad, Subview, F, L, D ) \
   TEUCHOS_UNIT_TEST_TEMPLATE_3_INSTANT( Kokkos_View_Fad, Subview2, F, L, D ) \
+  TEUCHOS_UNIT_TEST_TEMPLATE_3_INSTANT( Kokkos_View_Fad, DeepCopyNonContiguous, F, L, D ) \
   TEUCHOS_UNIT_TEST_TEMPLATE_3_INSTANT( Kokkos_View_Fad, ShmemSize, F, L, D ) \
   TEUCHOS_UNIT_TEST_TEMPLATE_3_INSTANT( Kokkos_View_Fad, ConstViewAssign, F, L, D )
 
