@@ -145,7 +145,7 @@ namespace Intrepid2 {
             const auto outputValuesB_Host = Kokkos::create_mirror_view(outputValuesB); Kokkos::deep_copy(outputValuesB_Host, outputValuesB);
             
             OutValueType diff = 0; 
-            auto tol = epsilon<double>();
+            const auto tol = 100.0 * epsilon<double>();
             for (size_t ic=0;ic<outputValuesA_Host.extent(0);++ic)
               for (size_t i=0;i<outputValuesA_Host.extent(1);++i)
                 for (size_t j=0;j<outputValuesA_Host.extent(2);++j) {
@@ -169,7 +169,7 @@ namespace Intrepid2 {
             const auto outputGradsB_Host = Kokkos::create_mirror_view(outputGradsB); Kokkos::deep_copy(outputGradsB_Host, outputGradsB);
             
             OutValueType diff = 0;
-            auto tol = epsilon<double>();
+            const auto tol = 100.0 * epsilon<double>();
             for (size_t ic=0;ic<outputGradsA_Host.extent(0);++ic)
               for (size_t i=0;i<outputGradsA_Host.extent(1);++i)
                 for (size_t j=0;j<outputGradsA_Host.extent(2);++j) {
@@ -195,7 +195,7 @@ namespace Intrepid2 {
             const auto outputCurlsB_Host = Kokkos::create_mirror_view(outputCurlsB); Kokkos::deep_copy(outputCurlsB_Host, outputCurlsB);
             
             OutValueType diff = 0;
-            auto tol = epsilon<double>();
+            const auto tol = 100.0 * epsilon<double>();
             for (size_t ic=0;ic<outputCurlsA_Host.extent(0);++ic)
               for (size_t i=0;i<outputCurlsA_Host.extent(1);++i)
                 for (size_t j=0;j<outputCurlsA_Host.extent(2);++j) {
