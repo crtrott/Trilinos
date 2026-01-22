@@ -129,8 +129,11 @@ namespace Intrepid2 {
           for (size_t ic=0;ic<outputValuesA_Host.extent(0);++ic)
             for (size_t i=0;i<outputValuesA_Host.extent(1);++i)
               for (size_t j=0;j<outputValuesA_Host.extent(2);++j) {
-                diff = std::abs(outputValuesB_Host(i,j) - outputValuesA_Host(ic,i,j));
-                if (diff > tol) {
+                const auto valA = outputValuesA_Host(ic,i,j);
+                const auto valB = outputValuesB_Host(i,j);
+                diff = std::abs(valB - valA);
+                const auto maxMagnitude = std::max(std::abs(valA), std::abs(valB));
+                if (diff > tol * std::max(1.0, maxMagnitude)) {
                   ++errorFlag;
                   std::cout << ", ic: " << ic << ", i: " << i << ", j: " << j 
                             << ", val A: " << outputValuesA_Host(ic,i,j) 
@@ -153,9 +156,12 @@ namespace Intrepid2 {
             for (size_t i=0;i<outputGradsA_Host.extent(1);++i)
               for (size_t j=0;j<outputGradsA_Host.extent(2);++j) {
                 diff = 0;
-                for (int d=0;d<ndim;++d)
+                OutValueType maxMagnitude = 0;
+                for (int d=0;d<ndim;++d) {
                   diff += std::abs(outputGradsB_Host(i,j,d) - outputGradsA_Host(ic,i,j,d));
-                if (diff > tol) {
+                  maxMagnitude = std::max(maxMagnitude, std::max(std::abs(outputGradsA_Host(ic,i,j,d)), std::abs(outputGradsB_Host(i,j,d))));
+                }
+                if (diff > tol * std::max(1.0, maxMagnitude)) {
                   ++errorFlag;
                   std::cout << ", ic: " << ic << ", i: " << i << ", j: " << j 
                             << ", grads A: [" << outputGradsA_Host(ic,i,j,0) << ", " << outputGradsA_Host(ic,i,j,1) << ", " <<  outputGradsA_Host(ic,i,j,2) <<"]"

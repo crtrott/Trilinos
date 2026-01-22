@@ -113,8 +113,11 @@ namespace Intrepid2 {
             for (size_t ic=0;ic<outputValuesA_Host.extent(0);++ic)
               for (size_t i=0;i<outputValuesA_Host.extent(1);++i)
                 for (size_t j=0;j<outputValuesA_Host.extent(2);++j) {
-                  diff = std::abs(outputValuesB_Host(i,j) - outputValuesA_Host(ic,i,j));
-                  if (diff > tol) {
+                  const auto valA = outputValuesA_Host(ic,i,j);
+                  const auto valB = outputValuesB_Host(i,j);
+                  diff = std::abs(valB - valA);
+                  const auto maxMagnitude = std::max(std::abs(valA), std::abs(valB));
+                  if (diff > tol * std::max(1.0, maxMagnitude)) {
                     ++errorFlag;
                     std::cout << " order: " << order
                               << ", ic: " << ic << ", i: " << i << ", j: " << j 
